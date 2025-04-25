@@ -1,0 +1,56 @@
+import pytesseract
+import cv2
+import numpy as np
+import time
+import pyautogui
+from telegram import Bot
+
+# === CONFIGS DO TELEGRAM ===
+TOKEN = '8117007775:AAFtwIRsuTktL5X4yuqirtsH1wxS5Jt7MQo'
+CHAT_ID = -1002590146449  # chat_id do seu grupo ou canal
+
+bot = Bot(token=TOKEN)
+
+# === COORDENADAS DA ÁREA COM RESULTADOS DO FAN TAN ===
+# Use o script de calibragem se ainda não pegou
+x, y, largura, altura = 100, 200, 300, 50  # <- Substitua pelos valores reais da sua tela
+
+# === FUNÇÕES ===
+def capturar_resultados():
+    screenshot = pyautogui.screenshot(region=(x, y, largura, altura))
+    img = cv2.cvtColor(np.array(screenshot), cv2.COLOR_RGB2BGR)
+    texto = pytesseract.image_to_string(img, config='--psm 6')
+    return texto
+
+def analisar_resultados(texto):
+    numeros = [int(n) for n in texto.split() if n in ['1', '2', '3', '4']]
+    if not numeros:
+        return "OCR falhou ou sem dados válidos."
+
+    total = len(numeros)
+    contagem = {i: numeros.count(i) for i in range(1, 5)}
+    probabilidades = {k: round(v / total * 100, 2) for k, v in contagem.items()}
+    melhor = max(probabilidades, key=probabilidades.get)
+
+    resposta = f"[Fan Tan - Análise automática]\nÚltimos {total} resultados lidos:\n"
+    for i in range(1, 5):
+        resposta += f"Número {i}: {probabilidades.get(i, 0.0)}%\n"
+    resposta += f"\n**Sugestão de aposta: Número {melhor}**"
+    return resposta
+
+def loop_monitoramento(intervalo=30):
+    print("Bot do Fan Tan rodando... Pressione Ctrl+C pra parar.")
+    while True:
+        try:
+            texto = capturar_resultados()
+            resposta = analisar_resultados(texto)
+            print(resposta)
+            bot.send_message(chat_id=CHAT_ID, text=resposta)
+            time.sleep(intervalo)
+        except Exception as e:
+            print(f"[ERRO] {e}")
+            time.sleep(10)
+
+# === INÍCIO ===
+if __name__ == '__main__':
+    loop_monitoramento()
